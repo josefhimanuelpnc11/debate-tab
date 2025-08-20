@@ -262,12 +262,12 @@ export default function TournamentPage() {
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Rank</th>
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Team</th>
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Institution</th>
-                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Total Points</th>
-                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Avg Speaker Score</th>
                       {/* Dynamic round headers */}
                       {rounds.length > 0 && rounds.map((round) => (
                         <th key={round.id} className="text-center py-3 px-3 font-semibold text-zinc-300">R{round.round_number}</th>
                       ))}
+                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Total Points</th>
+                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Avg Speaker Score</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -309,15 +309,6 @@ export default function TournamentPage() {
                             <div className="font-medium text-white">{team.name}</div>
                           </td>
                           <td className="py-3 px-4 text-zinc-400">{team.institution || '-'}</td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="font-bold text-white">{team.totalPoints}</div>
-                            <div className="text-xs text-zinc-400">{team.matchesPlayed} matches</div>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="font-medium text-white">
-                              {team.avgSpeakerScore > 0 ? team.avgSpeakerScore.toFixed(1) : '-'}
-                            </div>
-                          </td>
                           {/* Round results for this team */}
                           {rounds.length > 0 && rounds.map((round, roundIndex) => {
                             const roundResult = team.roundResults[roundIndex]
@@ -341,6 +332,15 @@ export default function TournamentPage() {
                               </td>
                             )
                           })}
+                          <td className="py-3 px-4 text-center">
+                            <div className="font-bold text-white">{team.totalPoints}</div>
+                            <div className="text-xs text-zinc-400">{team.matchesPlayed} matches</div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="font-medium text-white">
+                              {team.avgSpeakerScore > 0 ? team.avgSpeakerScore.toFixed(1) : '-'}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                   </tbody>

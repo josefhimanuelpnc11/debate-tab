@@ -97,6 +97,22 @@ export default function TournamentsAdmin() {
 
   return (
     <section>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Tournament Management</h1>
+          <p className="mt-1 text-zinc-400">Create and manage debate tournaments</p>
+        </div>
+        <Link 
+          to="/admin/tournaments/new"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Tournament
+        </Link>
+      </div>
+
       <form onSubmit={createTournament} className="mb-4 grid gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
         <div>
           <label className="block text-sm text-zinc-300" htmlFor="name">Name</label>
@@ -151,30 +167,18 @@ export default function TournamentsAdmin() {
               <div className="mt-3 p-3 bg-zinc-800/50 rounded-md border border-zinc-700">
                 <div className="text-xs text-zinc-300 mb-2 font-medium">🛠️ Manage Tournament:</div>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/teams`}>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.slug}`}>
+                    🏠 Dashboard
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-green-600 hover:bg-green-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.slug}/teams`}>
                     👥 Teams
                   </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-green-600 hover:bg-green-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/rounds`}>
-                    🎯 Rounds
-                  </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/speakers`}>
-                    🎤 Speakers
-                  </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/speaker-scores`}>
-                    📊 Speaker Scores
-                  </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-orange-600 hover:bg-orange-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/members`}>
-                    👤 Members
-                  </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-red-600 hover:bg-red-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/match-teams`}>
-                    ⚔️ Match Teams
-                  </Link>
-                  <Link className="inline-flex items-center gap-1 rounded-md bg-yellow-600 hover:bg-yellow-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/results`}>
-                    🏆 Results
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-white transition-colors" to={`/tournament/${t.slug}`}>
+                    👁️ Public View
                   </Link>
                 </div>
                 <div className="mt-2 text-xs text-zinc-400">
-                  💡 Links will open in tournament-scoped admin interface
+                  💡 Access tournament administration and public view
                 </div>
               </div>
             </div>

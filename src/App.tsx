@@ -9,7 +9,9 @@ import AdminLayout from './pages/admin/AdminLayout'
 import AdminHome from './pages/admin/AdminHome'
 import AdminGuard from './pages/admin/AdminGuard'
 import TournamentsAdmin from './pages/admin/TournamentsAdmin'
-import TeamsAdmin from './pages/admin/TeamsAdmin'
+import CreateTournament from './pages/admin/CreateTournament'
+import TournamentAdmin from './pages/admin/TournamentAdmin'
+import TeamsAdmin from './pages/admin/TeamsAdminNew'
 import RoundsAdmin from './pages/admin/RoundsAdmin'
 import SpeakersAdmin from './pages/admin/SpeakersAdmin'
 import MatchTeamsAdmin from './pages/admin/MatchTeamsAdmin'
@@ -23,19 +25,25 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/tournament/:id" element={<TournamentPage />} />
+        <Route path="/tournament/:slug" element={<TournamentPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route element={<AdminGuard />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminHome />} />
             <Route path="tournaments" element={<TournamentsAdmin />} />
+            <Route path="tournaments/new" element={<CreateTournament />} />
             <Route path="users" element={<UsersAdmin />} />
           </Route>
+        </Route>
+        {/* Tournament-specific admin routes */}
+        <Route element={<AdminGuard />}>
+          <Route path="/admin/tournament/:slug" element={<TournamentAdmin />} />
+          <Route path="/admin/tournament/:slug/teams" element={<TeamsAdmin />} />
+          <Route path="/admin/tournament/:slug/teams/new" element={<TeamsAdmin />} />
         </Route>
         {/* Tournament-scoped admin routes - with different path to avoid conflict */}
         <Route element={<AdminGuard />}>
           <Route path="/admin/tournament/:id" element={<TournamentAdminScope />}>
-            <Route path="teams" element={<TeamsAdmin />} />
             <Route path="rounds" element={<RoundsAdmin />} />
             <Route path="speakers" element={<SpeakersAdmin />} />
             <Route path="speaker-scores" element={<SpeakerScoresAdmin />} />

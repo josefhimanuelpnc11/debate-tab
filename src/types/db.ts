@@ -28,6 +28,9 @@ export type Member = {
   user_id: string
   team_id: string
   role: 'leader' | 'member' | 'substitute'
+  total_points?: number
+  average_points?: number
+  rounds_participated?: number
   created_at?: string
 }
 
@@ -37,6 +40,29 @@ export type Speaker = {
   team_id: string
   speaker_order?: number
   created_at?: string
+}
+
+export type SpeakerScore = {
+  id: string
+  member_id: string
+  match_id: string
+  round_id: string
+  points: number
+  created_at?: string
+}
+
+export type SpeakerStanding = {
+  id: string
+  member_id: string
+  speaker_name: string | null
+  team_name: string
+  institution: string | null
+  total_points: number
+  average_points: number
+  rounds_participated: number
+  tournament_id: string
+  standard_deviation: number
+  round_scores: number[] | null
 }
 
 export type Standing = {

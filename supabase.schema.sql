@@ -357,3 +357,160 @@ create policy if not exists "match_teams readable by anon" on public.match_teams
   for select to anon using (true);
 create policy if not exists "results readable by anon" on public.results
   for select to anon using (true);
+
+-- Tabel untuk menyimpan skor speaker per ronde per match
+CREATE TABLE IF NOT EXISTS public.speaker_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id UUID REFERENCES public.members(id) ON DELETE CASCADE,
+  match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
+  round_id UUID REFERENCES public.rounds(id) ON DELETE CASCADE,
+  points DECIMAL(4,2) CHECK (points >= 0 AND points <= 100),
+  created_at TIMESTAMP DEFAULT NOW(),
+  
+  -- Constraint untuk memastikan satu speaker hanya punya satu skor per match
+  UNIQUE(member_id, match_id)
+);
+
+-- Index untuk performa query
+CREATE INDEX IF NOT EXISTS idx_speaker_scores_member_id ON public.speaker_scores(member_id);
+CREATE INDEX IF NOT EXISTS idx_speaker_scores_match_id ON public.speaker_scores(match_id);
+CREATE INDEX IF NOT EXISTS idx_speaker_scores_round_id ON public.speaker_scores(round_id);
+
+-- RLS policies untuk speaker_scores
+ALTER TABLE public.speaker_scores ENABLE ROW LEVEL SECURITY;
+
+-- Read policy untuk anon (public viewing)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='speaker_scores' AND policyname='speaker_scores readable by anon'
+  ) THEN
+    CREATE POLICY "speaker_scores readable by anon" 
+    ON public.speaker_scores FOR SELECT TO anon USING (true);
+  END IF;
+END $$;
+
+-- Write policies untuk admin
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='speaker_scores' AND policyname='speaker_scores write for admins'
+  ) THEN
+    CREATE POLICY "speaker_scores write for admins" 
+    ON public.speaker_scores FOR ALL TO authenticated
+    USING (EXISTS(SELECT 1 FROM public.users u WHERE (u.email = (auth.jwt() ->> 'email')) AND COALESCE(u.is_admin,false)))
+    WITH CHECK (EXISTS(SELECT 1 FROM public.users u WHERE (u.email = (auth.jwt() ->> 'email')) AND COALESCE(u.is_admin,false)));
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='speaker_scores' AND policyname='speaker_scores write for admins via uid'
+  ) THEN
+    CREATE POLICY "speaker_scores write for admins via uid" 
+    ON public.speaker_scores FOR ALL TO authenticated
+    USING (EXISTS(SELECT 1 FROM public.users u WHERE u.auth_uid = auth.uid() AND COALESCE(u.is_admin,false)))
+    WITH CHECK (EXISTS(SELECT 1 FROM public.users u WHERE u.auth_uid = auth.uid() AND COALESCE(u.is_admin,false)));
+  END IF;
+END $$;
+
+-- Menambah kolom total_points ke tabel members
+ALTER TABLE public.members 
+ADD COLUMN IF NOT EXISTS total_points INTEGER DEFAULT 0;
+
+-- Menambah kolom average_points ke tabel members untuk kemudahan query
+ALTER TABLE public.members 
+ADD COLUMN IF NOT EXISTS average_points DECIMAL(5,2) DEFAULT 0.00;
+
+-- Menambah kolom rounds_participated untuk tracking berapa ronde yang diikuti
+ALTER TABLE public.members 
+ADD COLUMN IF NOT EXISTS rounds_participated INTEGER DEFAULT 0;
+
+-- Function untuk menghitung total points, average, dan rounds participated
+CREATE OR REPLACE FUNCTION public.update_member_statistics(member_uuid UUID)
+RETURNS VOID AS $$
+DECLARE
+  total_pts INTEGER;
+  avg_pts DECIMAL(5,2);
+  rounds_count INTEGER;
+BEGIN
+  -- Hitung total points dan rounds dari speaker_scores
+  SELECT 
+    COALESCE(SUM(points), 0)::INTEGER,
+    COALESCE(AVG(points), 0)::DECIMAL(5,2),
+    COUNT(*)::INTEGER
+  INTO total_pts, avg_pts, rounds_count
+  FROM public.speaker_scores 
+  WHERE member_id = member_uuid;
+  
+  -- Update tabel members
+  UPDATE public.members 
+  SET 
+    total_points = total_pts,
+    average_points = avg_pts,
+    rounds_participated = rounds_count
+  WHERE id = member_uuid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION public.update_member_statistics(UUID) TO authenticated, anon;
+
+-- Trigger function untuk otomatis update statistics ketika speaker_scores berubah
+CREATE OR REPLACE FUNCTION public.trigger_update_member_statistics()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Update untuk member_id lama (jika ada)
+  IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN
+    PERFORM public.update_member_statistics(OLD.member_id);
+  END IF;
+  
+  -- Update untuk member_id baru (jika ada)
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    PERFORM public.update_member_statistics(NEW.member_id);
+  END IF;
+  
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Buat trigger
+DROP TRIGGER IF EXISTS speaker_scores_update_statistics ON public.speaker_scores;
+CREATE TRIGGER speaker_scores_update_statistics
+  AFTER INSERT OR UPDATE OR DELETE ON public.speaker_scores
+  FOR EACH ROW EXECUTE FUNCTION public.trigger_update_member_statistics();
+
+-- Create view untuk speaker standings dengan statistik lengkap
+CREATE OR REPLACE VIEW public.speaker_standings AS
+SELECT 
+  m.id,
+  COALESCE(u.full_name, u.email, 'Unknown Speaker') AS speaker_name,
+  t.name AS team_name,
+  t.institution,
+  COALESCE(m.total_points, 0) AS total_points,
+  COALESCE(m.average_points, 0.00) AS average_points,
+  COALESCE(m.rounds_participated, 0) AS rounds_participated,
+  t.tournament_id,
+  -- Hitung standard deviation
+  COALESCE((
+    SELECT 
+      CASE 
+        WHEN COUNT(*) > 1 THEN 
+          SQRT(SUM(POWER(ss.points - COALESCE(m.average_points, 0), 2)) / (COUNT(*) - 1))::DECIMAL(5,2)
+        ELSE 0.00
+      END
+    FROM public.speaker_scores ss 
+    WHERE ss.member_id = m.id
+  ), 0.00) AS standard_deviation,
+  -- Array skor per ronde untuk ditampilkan
+  (
+    SELECT array_agg(ss.points ORDER BY r.round_number)
+    FROM public.speaker_scores ss
+    JOIN public.rounds r ON r.id = ss.round_id
+    WHERE ss.member_id = m.id
+  ) AS round_scores
+FROM public.members m
+JOIN public.users u ON u.id = m.user_id
+JOIN public.teams t ON t.id = m.team_id
+-- Tampilkan semua member, bukan hanya yang sudah ada skornya
+-- WHERE m.total_points > 0  -- Commented out untuk testing
+ORDER BY COALESCE(m.total_points, 0) DESC, COALESCE(m.average_points, 0) DESC;
+
+-- Grant access to view
+GRANT SELECT ON public.speaker_standings TO anon, authenticated;

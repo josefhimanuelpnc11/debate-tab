@@ -17,6 +17,7 @@ import MatchTeamsAdmin from './pages/admin/MatchTeamsAdmin'
 import ResultsAdmin from './pages/admin/ResultsAdmin'
 import TournamentAdminScope from './pages/admin/TournamentAdminScope'
 import UsersAdmin from './pages/admin/UsersAdmin'
+import SpeakerScoresAdmin from './pages/admin/SpeakerScoresAdmin'
 
 function App() {
   return (
@@ -25,28 +26,24 @@ function App() {
   <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tournament/:id" element={<TournamentPage />} />
-  <Route path="/auth" element={<AuthPage />} />
+        <Route path="/auth" element={<AuthPage />} />
         <Route element={<AdminGuard />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminHome />} />
             <Route path="tournaments" element={<TournamentsAdmin />} />
             <Route path="users" element={<UsersAdmin />} />
-            <Route path="tournaments/:id" element={<TournamentAdminScope />}>
-              <Route path="teams" element={<TeamsAdmin />} />
-              <Route path="rounds" element={<RoundsAdmin />} />
-              <Route path="speakers" element={<SpeakersAdmin />} />
-              <Route path="members" element={<MembersAdmin />} />
-              <Route path="match-teams" element={<MatchTeamsAdmin />} />
-              <Route path="results" element={<ResultsAdmin />} />
-            </Route>
-            <Route element={<TournamentAdminScope />}>
-              <Route path="teams" element={<TeamsAdmin />} />
-              <Route path="rounds" element={<RoundsAdmin />} />
-              <Route path="speakers" element={<SpeakersAdmin />} />
-              <Route path="members" element={<MembersAdmin />} />
-              <Route path="match-teams" element={<MatchTeamsAdmin />} />
-              <Route path="results" element={<ResultsAdmin />} />
-            </Route>
+          </Route>
+        </Route>
+        {/* Tournament-scoped admin routes - with different path to avoid conflict */}
+        <Route element={<AdminGuard />}>
+          <Route path="/admin/tournament/:id" element={<TournamentAdminScope />}>
+            <Route path="teams" element={<TeamsAdmin />} />
+            <Route path="rounds" element={<RoundsAdmin />} />
+            <Route path="speakers" element={<SpeakersAdmin />} />
+            <Route path="speaker-scores" element={<SpeakerScoresAdmin />} />
+            <Route path="members" element={<MembersAdmin />} />
+            <Route path="match-teams" element={<MatchTeamsAdmin />} />
+            <Route path="results" element={<ResultsAdmin />} />
           </Route>
         </Route>
       </Routes>

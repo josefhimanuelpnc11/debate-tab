@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../config/supabase'
 import type { Tournament } from '../../types/db'
 
@@ -147,13 +148,34 @@ export default function TournamentsAdmin() {
             <div>
               <div className="font-semibold text-white">{t.name} <span className="ml-2 rounded border border-zinc-700 px-1.5 py-0.5 text-xs text-zinc-300">{(t as any).format ?? 'BP'}</span></div>
               {t.description && <div className="text-sm text-zinc-400">{t.description}</div>}
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/teams`}>Teams</a>
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/rounds`}>Rounds</a>
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/speakers`}>Speakers</a>
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/members`}>Members</a>
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/match-teams`}>Match Teams</a>
-                <a className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-zinc-200" href={`#/admin/tournaments/${t.id}/results`}>Results</a>
+              <div className="mt-3 p-3 bg-zinc-800/50 rounded-md border border-zinc-700">
+                <div className="text-xs text-zinc-300 mb-2 font-medium">🛠️ Manage Tournament:</div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/teams`}>
+                    👥 Teams
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-green-600 hover:bg-green-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/rounds`}>
+                    🎯 Rounds
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/speakers`}>
+                    🎤 Speakers
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/speaker-scores`}>
+                    📊 Speaker Scores
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-orange-600 hover:bg-orange-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/members`}>
+                    👤 Members
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-red-600 hover:bg-red-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/match-teams`}>
+                    ⚔️ Match Teams
+                  </Link>
+                  <Link className="inline-flex items-center gap-1 rounded-md bg-yellow-600 hover:bg-yellow-500 px-3 py-1.5 text-white transition-colors" to={`/admin/tournament/${t.id}/results`}>
+                    🏆 Results
+                  </Link>
+                </div>
+                <div className="mt-2 text-xs text-zinc-400">
+                  💡 Links will open in tournament-scoped admin interface
+                </div>
               </div>
             </div>
             <div className="flex gap-2">

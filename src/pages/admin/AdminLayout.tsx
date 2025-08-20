@@ -12,9 +12,7 @@ export default function AdminLayout() {
           <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/teams">Teams</Link>
           <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/rounds">Rounds</Link>
           <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/speakers">Speakers</Link>
-          <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/members">Members</Link>
           <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/match-teams">Match Teams</Link>
-          <Link className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-200" to="/admin/results">Results</Link>
         </nav>
       </div>
       <Outlet />

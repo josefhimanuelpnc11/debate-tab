@@ -12,9 +12,7 @@ import TournamentsAdmin from './pages/admin/TournamentsAdmin'
 import TeamsAdmin from './pages/admin/TeamsAdmin'
 import RoundsAdmin from './pages/admin/RoundsAdmin'
 import SpeakersAdmin from './pages/admin/SpeakersAdmin'
-import MembersAdmin from './pages/admin/MembersAdmin'
 import MatchTeamsAdmin from './pages/admin/MatchTeamsAdmin'
-import ResultsAdmin from './pages/admin/ResultsAdmin'
 import TournamentAdminScope from './pages/admin/TournamentAdminScope'
 import UsersAdmin from './pages/admin/UsersAdmin'
 import SpeakerScoresAdmin from './pages/admin/SpeakerScoresAdmin'
@@ -41,9 +39,7 @@ function App() {
             <Route path="rounds" element={<RoundsAdmin />} />
             <Route path="speakers" element={<SpeakersAdmin />} />
             <Route path="speaker-scores" element={<SpeakerScoresAdmin />} />
-            <Route path="members" element={<MembersAdmin />} />
             <Route path="match-teams" element={<MatchTeamsAdmin />} />
-            <Route path="results" element={<ResultsAdmin />} />
           </Route>
         </Route>
       </Routes>

@@ -18,7 +18,7 @@ export function useTournamentAdmin() {
   return ctx
 }
 
-type AdminTabType = 'teams' | 'rounds' | 'speakers' | 'speaker-scores' | 'members' | 'match-teams' | 'results'
+type AdminTabType = 'teams' | 'rounds' | 'speakers' | 'speaker-scores' | 'match-teams'
 
 export default function TournamentAdminScope() {
   const [tournaments, setTournaments] = useState<Tournament[]>([])
@@ -61,9 +61,7 @@ export default function TournamentAdminScope() {
     if (path.includes('/rounds')) return 'rounds'
     if (path.includes('/speakers') && !path.includes('/speaker-scores')) return 'speakers'
     if (path.includes('/speaker-scores')) return 'speaker-scores'
-    if (path.includes('/members')) return 'members'
     if (path.includes('/match-teams')) return 'match-teams'
-    if (path.includes('/results')) return 'results'
     return null
   }, [location.pathname])
 
@@ -72,14 +70,20 @@ export default function TournamentAdminScope() {
     return <Navigate to={`/admin/tournament/${params.id}/teams`} replace />
   }
 
+  // Redirect legacy URLs to appropriate pages
+  if (params.id && location.pathname.includes('/members')) {
+    return <Navigate to={`/admin/tournament/${params.id}/teams`} replace />
+  }
+  if (params.id && location.pathname.includes('/results')) {
+    return <Navigate to={`/admin/tournament/${params.id}/speaker-scores`} replace />
+  }
+
   const adminTabs = [
     { id: 'teams' as AdminTabType, label: 'Teams', icon: '👥' },
     { id: 'rounds' as AdminTabType, label: 'Rounds', icon: '🎯' },
     { id: 'speakers' as AdminTabType, label: 'Speakers', icon: '🎤' },
     { id: 'speaker-scores' as AdminTabType, label: 'Speaker Scores', icon: '📊' },
-    { id: 'members' as AdminTabType, label: 'Members', icon: '👤' },
     { id: 'match-teams' as AdminTabType, label: 'Match Teams', icon: '⚔️' },
-    { id: 'results' as AdminTabType, label: 'Results', icon: '🏆' },
   ]
 
   if (loading) return (

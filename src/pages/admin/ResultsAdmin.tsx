@@ -100,6 +100,7 @@ export default function ResultsAdmin() {
       const payload: any = { 
         match_id: matchId, 
         team_id: teamId, 
+        round_id: roundId,
         points: points,
         rank: rankNumber
       }

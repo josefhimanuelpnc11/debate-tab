@@ -51,6 +51,16 @@ export type SpeakerScore = {
   created_at?: string
 }
 
+export type Result = {
+  id: string
+  match_id: string
+  team_id: string
+  round_id?: string | null
+  points: number
+  rank: number
+  created_at?: string
+}
+
 export type SpeakerStanding = {
   id: string
   member_id: string

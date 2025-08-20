@@ -108,6 +108,13 @@ create table if not exists public.results (
   created_at timestamp default now()
 );
 
+-- Add round_id column to results table for better round tracking
+ALTER TABLE public.results 
+ADD COLUMN IF NOT EXISTS round_id UUID REFERENCES public.rounds(id) ON DELETE CASCADE;
+
+-- Add index for round_id for better query performance
+CREATE INDEX IF NOT EXISTS idx_results_round_id ON public.results(round_id);
+
 -- Row Level Security: enable
 alter table public.users enable row level security;
 alter table public.tournaments enable row level security;

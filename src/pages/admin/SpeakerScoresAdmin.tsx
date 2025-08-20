@@ -245,6 +245,7 @@ export default function SpeakerScoresAdmin() {
       const results = completeTeams.map((team, index) => ({
         match_id: selectedMatch,
         team_id: team.teamId,
+        round_id: selectedRound,
         rank: index + 1,
         points: calculatePoints(format, index + 1)
       }))

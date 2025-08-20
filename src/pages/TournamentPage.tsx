@@ -19,6 +19,7 @@ export default function TournamentPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [speakerStandings, setSpeakerStandings] = useState<SpeakerStanding[]>([])
   const [rounds, setRounds] = useState<Round[]>([])
+  const [results, setResults] = useState<Array<{id: string; match_id: string; team_id: string; round_id?: string; points: number; rank: number}>>([])
   const [users, setUsers] = useState<Record<string, User>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +100,13 @@ export default function TournamentPage() {
           .eq('tournament_id', id)
         if (roundErr) throw roundErr
         setRounds(roundData || [])
+
+        // Results (for team standings)
+        const { data: resultData, error: resultErr } = await supabase
+          .from('results')
+          .select('id, match_id, team_id, round_id, points, rank')
+        if (resultErr) throw resultErr
+        setResults(resultData || [])
 
         // Users for participants
         const userIds = (memberData || []).map((m: Member) => m.user_id)
@@ -254,20 +262,87 @@ export default function TournamentPage() {
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Rank</th>
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Team</th>
                       <th className="text-left py-3 px-4 font-semibold text-zinc-300">Institution</th>
-                      <th className="text-left py-3 px-4 font-semibold text-zinc-300">Points</th>
+                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Total Points</th>
+                      <th className="text-center py-3 px-4 font-semibold text-zinc-300">Avg Speaker Score</th>
+                      {/* Dynamic round headers */}
+                      {rounds.length > 0 && rounds.map((round) => (
+                        <th key={round.id} className="text-center py-3 px-3 font-semibold text-zinc-300">R{round.round_number}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {teams.map((team, index) => (
-                      <tr key={team.id} className="border-b border-zinc-700 hover:bg-zinc-700 transition-colors">
-                        <td className="py-3 px-4 font-medium text-white">{index + 1}</td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-white">{team.name}</div>
-                        </td>
-                        <td className="py-3 px-4 text-zinc-400">{team.institution || '-'}</td>
-                        <td className="py-3 px-4 font-medium text-white">-</td>
-                      </tr>
-                    ))}
+                    {teams
+                      .map(team => {
+                        // Calculate team statistics
+                        const teamResults = results.filter(r => r.team_id === team.id)
+                        const totalPoints = teamResults.reduce((sum, r) => sum + r.points, 0)
+                        const teamSpeakers = speakerStandings.filter(s => s.team_name === team.name)
+                        const avgSpeakerScore = teamSpeakers.length > 0 
+                          ? (teamSpeakers.reduce((sum, s) => sum + (s.average_points || 0), 0) / teamSpeakers.length)
+                          : 0
+
+                        // Get results per round for this team
+                        const roundResults = rounds.map((round) => {
+                          const roundResult = teamResults.find(result => result.round_id === round.id)
+                          return roundResult ? { points: roundResult.points, rank: roundResult.rank } : null
+                        })
+
+                        return { 
+                          ...team, 
+                          totalPoints, 
+                          avgSpeakerScore,
+                          roundResults,
+                          matchesPlayed: teamResults.length
+                        }
+                      })
+                      .sort((a, b) => {
+                        // Sort by total points first, then by average speaker score
+                        if (b.totalPoints !== a.totalPoints) {
+                          return b.totalPoints - a.totalPoints
+                        }
+                        return b.avgSpeakerScore - a.avgSpeakerScore
+                      })
+                      .map((team, index) => (
+                        <tr key={team.id} className="border-b border-zinc-700 hover:bg-zinc-700 transition-colors">
+                          <td className="py-3 px-4 font-medium text-white">{index + 1}</td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-white">{team.name}</div>
+                          </td>
+                          <td className="py-3 px-4 text-zinc-400">{team.institution || '-'}</td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="font-bold text-white">{team.totalPoints}</div>
+                            <div className="text-xs text-zinc-400">{team.matchesPlayed} matches</div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="font-medium text-white">
+                              {team.avgSpeakerScore > 0 ? team.avgSpeakerScore.toFixed(1) : '-'}
+                            </div>
+                          </td>
+                          {/* Round results for this team */}
+                          {rounds.length > 0 && rounds.map((round, roundIndex) => {
+                            const roundResult = team.roundResults[roundIndex]
+                            return (
+                              <td key={round.id} className="py-3 px-3 text-center text-sm">
+                                {roundResult ? (
+                                  <div className="space-y-1">
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                                      roundResult.points === 3 ? 'bg-yellow-900 text-yellow-300' :
+                                      roundResult.points === 2 ? 'bg-gray-900 text-gray-300' :
+                                      roundResult.points === 1 ? 'bg-orange-900 text-orange-300' :
+                                      'bg-red-900 text-red-300'
+                                    }`}>
+                                      {roundResult.points}pts
+                                    </span>
+                                    <div className="text-xs text-zinc-500">#{roundResult.rank}</div>
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-500">—</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>

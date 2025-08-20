@@ -1,13 +1,38 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../config/supabase'
-import type { Team, Round } from '../../types/db'
+import type { Team, Round, Tournament } from '../../types/db'
 import { useTournamentAdmin } from './TournamentAdminScope'
 
 type Match = { id: string; round_id: string }
 type Result = { id: string; match_id: string; team_id: string; points: number; rank: number | null }
 
+// Point calculation based on tournament format
+const calculatePoints = (format: 'BP' | 'AP', rank: number): number => {
+  if (format === 'BP') {
+    // British Parliamentary: 1st=3pts, 2nd=2pts, 3rd=1pt, 4th=0pts
+    switch (rank) {
+      case 1: return 3
+      case 2: return 2
+      case 3: return 1
+      case 4: return 0
+      default: return 0
+    }
+  } else if (format === 'AP') {
+    // Asian Parliamentary: 1st=3pts, 2nd=2pts, 3rd=1pt, 4th=0pts (same as BP for now)
+    switch (rank) {
+      case 1: return 3
+      case 2: return 2
+      case 3: return 1
+      case 4: return 0
+      default: return 0
+    }
+  }
+  return 0
+}
+
 export default function ResultsAdmin() {
   const { tournamentId } = useTournamentAdmin()
+  const [tournament, setTournament] = useState<Tournament | null>(null)
   const [rounds, setRounds] = useState<Round[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -15,10 +40,16 @@ export default function ResultsAdmin() {
   const [roundId, setRoundId] = useState('')
   const [matchId, setMatchId] = useState('')
   const [teamId, setTeamId] = useState('')
-  const [points, setPoints] = useState<number>(0)
   const [rank, setRank] = useState<number | ''>('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  async function loadTournament(tid?: string) {
+    const id = tid ?? tournamentId
+    if (!id) { setTournament(null); return }
+    const { data } = await supabase.from('tournaments').select('id,name,format').eq('id', id).maybeSingle()
+    setTournament(data as Tournament)
+  }
 
   async function loadRounds(tid?: string) {
     const id = tid ?? tournamentId
@@ -45,21 +76,38 @@ export default function ResultsAdmin() {
     setResults((data as Result[]) || [])
   }
 
-  useEffect(() => { loadRounds(); loadTeams(); setRoundId(''); setMatchId(''); setResults([]) }, [tournamentId])
+  useEffect(() => { 
+    loadTournament(); 
+    loadRounds(); 
+    loadTeams(); 
+    setRoundId(''); 
+    setMatchId(''); 
+    setResults([]) 
+  }, [tournamentId])
   useEffect(() => { loadMatches(); setMatchId(''); setResults([]) }, [roundId])
   useEffect(() => { loadResults() }, [matchId])
 
   async function addResult(e: React.FormEvent) {
     e.preventDefault()
-    if (!matchId || !teamId) return
+    if (!matchId || !teamId || rank === '' || !tournament) return
+    
     setCreating(true); setError(null)
     try {
-      const payload: any = { match_id: matchId, team_id: teamId, points }
-      payload.rank = rank === '' ? null : Number(rank)
+      // Auto-calculate points based on tournament format and rank
+      const rankNumber = Number(rank)
+      const points = calculatePoints(tournament.format || 'BP', rankNumber)
+      
+      const payload: any = { 
+        match_id: matchId, 
+        team_id: teamId, 
+        points: points,
+        rank: rankNumber
+      }
+      
       const { error } = await supabase.from('results').insert(payload)
       if (error) throw error
+      
       setTeamId('')
-      setPoints(0)
       setRank('')
       await loadResults()
     } catch (err: any) {
@@ -77,7 +125,33 @@ export default function ResultsAdmin() {
 
   return (
     <section>
-  <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+      {/* Info Banner */}
+      <div className="mb-6 rounded-lg bg-blue-900/30 border border-blue-700/50 p-4">
+        <div className="flex items-center gap-3">
+          <div className="text-2xl">ℹ️</div>
+          <div>
+            <h3 className="text-lg font-semibold text-blue-200">Auto-Calculated Results</h3>
+            <p className="text-sm text-blue-300 mt-1">
+              Team rankings and points are now automatically calculated from Speaker Scores. 
+              Go to <strong>Speaker Scores</strong> tab to input individual speaker scores, 
+              and team results will be generated automatically based on total team scores.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tournament Format Info */}
+      {tournament && (
+        <div className="mb-4 rounded-lg bg-zinc-800 p-4">
+          <h3 className="text-lg font-semibold text-white">Tournament: {tournament.name}</h3>
+          <p className="text-sm text-zinc-400">
+            Format: <span className="font-medium text-white">{tournament.format || 'BP'}</span>
+            {' '} | Points: 1st=3pts, 2nd=2pts, 3rd=1pt, 4th=0pts
+          </p>
+        </div>
+      )}
+
+      <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-4">
         <div>
           <label className="block text-sm text-zinc-300">Round</label>
           <select value={roundId} onChange={e=>setRoundId(e.target.value)} className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none">
@@ -92,6 +166,14 @@ export default function ResultsAdmin() {
             {matches.map(m => <option key={m.id} value={m.id}>{m.id.slice(0,8)}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* Manual Entry (Deprecated) */}
+      <div className="mb-6 rounded-lg bg-yellow-900/20 border border-yellow-700/50 p-4">
+        <h4 className="text-yellow-200 font-medium mb-2">⚠️ Manual Entry (Not Recommended)</h4>
+        <p className="text-sm text-yellow-300 mb-3">
+          This manual entry method is deprecated. Results should be calculated automatically from Speaker Scores.
+        </p>
         <form onSubmit={addResult} className="flex flex-wrap items-end gap-2">
           <div>
             <label className="block text-sm text-zinc-300">Team</label>
@@ -101,14 +183,21 @@ export default function ResultsAdmin() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-zinc-300">Points (0-3)</label>
-            <input type="number" min={0} max={3} value={points} onChange={e=>setPoints(parseInt(e.target.value||'0'))} className="w-24 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none" />
-          </div>
-          <div>
             <label className="block text-sm text-zinc-300">Rank (1-4)</label>
-            <input type="number" min={1} max={4} value={rank} onChange={e=>setRank(e.target.value===''? '': parseInt(e.target.value))} className="w-24 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none" />
+            <select value={rank} onChange={e=>setRank(e.target.value===''? '': parseInt(e.target.value))} className="w-24 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none">
+              <option value="">—</option>
+              <option value="1">1st</option>
+              <option value="2">2nd</option>
+              <option value="3">3rd</option>
+              <option value="4">4th</option>
+            </select>
           </div>
-          <button disabled={!matchId || !teamId || creating} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">{creating? 'Add…':'Add Result'}</button>
+          {rank !== '' && tournament && (
+            <div className="text-sm text-zinc-400">
+              → {calculatePoints(tournament.format || 'BP', Number(rank))} points
+            </div>
+          )}
+          <button disabled={!matchId || !teamId || rank === '' || creating} className="rounded-md bg-yellow-600 px-3 py-2 text-sm font-medium text-white hover:bg-yellow-500 disabled:opacity-60">{creating? 'Add…':'Manual Add'}</button>
         </form>
       </div>
       {error && <p className="mb-2 text-sm text-rose-400">Error: {error}</p>}

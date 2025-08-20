@@ -36,6 +36,8 @@ export default function SpeakerScoresAdmin() {
   const [error, setError] = useState<string | null>(null)
   const [selectedRound, setSelectedRound] = useState<string>('')
   const [selectedMatch, setSelectedMatch] = useState<string>('')
+  const [teamPreview, setTeamPreview] = useState<Array<{ teamId: string; teamName: string; total: number; rank: number; points: number }>>([])
+  const [autoCalculated, setAutoCalculated] = useState(false)
 
   async function loadData() {
     if (!tournamentId) return
@@ -123,6 +125,12 @@ export default function SpeakerScoresAdmin() {
     }
   }, [selectedRound])
 
+  useEffect(() => {
+    // Reset auto-calculation state when match changes
+    setAutoCalculated(false)
+    setTeamPreview([])
+  }, [selectedMatch])
+
   async function saveScore(memberId: string, points: number) {
     if (!selectedMatch || !selectedRound) {
       alert('Please select a round and match first')
@@ -143,10 +151,114 @@ export default function SpeakerScoresAdmin() {
 
       if (error) throw error
       
-      // Reload scores
+      // Reload scores and check if we can calculate team results
       await loadData()
+      await calculateTeamResults()
     } catch (err: any) {
       alert(`Error saving score: ${err.message}`)
+    }
+  }
+
+  async function calculateTeamResults() {
+    if (!selectedMatch || !tournamentId) return
+
+    try {
+      // Get tournament format for points calculation
+      const { data: tournamentData } = await supabase
+        .from('tournaments')
+        .select('format')
+        .eq('id', tournamentId)
+        .single()
+
+      const format = tournamentData?.format || 'BP'
+
+      // Get all speaker scores for this match, grouped by team
+      const { data: scoresData } = await supabase
+        .from('speaker_scores')
+        .select(`
+          points,
+          members!inner(
+            team_id,
+            teams!inner(name)
+          )
+        `)
+        .eq('match_id', selectedMatch)
+
+      if (!scoresData) return
+
+      // Group scores by team and calculate totals
+      const teamTotals = new Map<string, { name: string; total: number; count: number }>()
+      
+      scoresData.forEach((score: any) => {
+        const teamId = score.members.team_id
+        const teamName = score.members.teams.name
+        const current = teamTotals.get(teamId) || { name: teamName, total: 0, count: 0 }
+        current.total += score.points
+        current.count += 1
+        teamTotals.set(teamId, current)
+      })
+
+      // Only proceed if we have complete data (teams with 2 speakers each)
+      const completeTeams = Array.from(teamTotals.entries())
+        .filter(([_, data]) => data.count === 2)
+        .map(([teamId, data]) => ({ teamId, ...data }))
+
+      if (completeTeams.length < 2) {
+        console.log('Not enough complete team scores to calculate results')
+        return
+      }
+
+      // Sort teams by total score (highest first) and assign ranks
+      completeTeams.sort((a, b) => b.total - a.total)
+      
+      // Calculate points based on tournament format and rank
+      const calculatePoints = (format: string, rank: number): number => {
+        if (format === 'BP' || format === 'AP') {
+          switch (rank) {
+            case 1: return 3
+            case 2: return 2
+            case 3: return 1
+            case 4: return 0
+            default: return 0
+          }
+        }
+        return 0
+      }
+
+      // Update preview
+      const preview = completeTeams.map((team, index) => ({
+        teamId: team.teamId,
+        teamName: team.name,
+        total: team.total,
+        rank: index + 1,
+        points: calculatePoints(format, index + 1)
+      }))
+      setTeamPreview(preview)
+
+      // Clear existing results for this match
+      await supabase
+        .from('results')
+        .delete()
+        .eq('match_id', selectedMatch)
+
+      // Insert new results
+      const results = completeTeams.map((team, index) => ({
+        match_id: selectedMatch,
+        team_id: team.teamId,
+        rank: index + 1,
+        points: calculatePoints(format, index + 1)
+      }))
+
+      const { error: resultsError } = await supabase
+        .from('results')
+        .insert(results)
+
+      if (resultsError) throw resultsError
+
+      setAutoCalculated(true)
+      console.log('Team results calculated automatically:', results)
+    } catch (err: any) {
+      console.error('Error calculating team results:', err)
     }
   }
 
@@ -293,6 +405,73 @@ export default function SpeakerScoresAdmin() {
                     </tr>
                   )
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Team Results Preview */}
+      {selectedMatch && teamPreview.length > 0 && (
+        <div className="bg-zinc-800 border border-zinc-700 rounded-lg">
+          <div className="px-6 py-4 border-b border-zinc-700">
+            <h3 className="text-lg font-medium text-white flex items-center gap-2">
+              🏆 Auto-Calculated Team Results
+              {autoCalculated && (
+                <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                  Saved to Results
+                </span>
+              )}
+            </h3>
+            <p className="text-sm text-zinc-400 mt-1">
+              Teams ranked by total speaker scores
+            </p>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-zinc-900/60">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                    Rank
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                    Team
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                    Total Score
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                    Points
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-zinc-800 divide-y divide-zinc-700">
+                {teamPreview.map((team) => (
+                  <tr key={team.teamId} className="hover:bg-zinc-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${
+                          team.rank === 1 ? 'bg-yellow-500' :
+                          team.rank === 2 ? 'bg-gray-400' :
+                          team.rank === 3 ? 'bg-orange-600' :
+                          'bg-zinc-600'
+                        }`}>
+                          {team.rank}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-white">{team.teamName}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-white font-mono">{team.total.toFixed(1)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-white font-bold">{team.points}</div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -21,9 +21,9 @@ import SpeakerScoresAdmin from './pages/admin/SpeakerScoresAdmin'
 
 function App() {
   return (
-  <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Navbar />
-  <Routes>
+      <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tournament/:id" element={<TournamentPage />} />
         <Route path="/auth" element={<AuthPage />} />
@@ -47,7 +47,7 @@ function App() {
           </Route>
         </Route>
       </Routes>
-  <Footer />
+      <Footer />
     </BrowserRouter>
   )
 }

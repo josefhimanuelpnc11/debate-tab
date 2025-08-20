@@ -101,12 +101,18 @@ export default function TournamentPage() {
         if (roundErr) throw roundErr
         setRounds(roundData || [])
 
-        // Results (for team standings)
-        const { data: resultData, error: resultErr } = await supabase
-          .from('results')
-          .select('id, match_id, team_id, round_id, points, rank')
-        if (resultErr) throw resultErr
-        setResults(resultData || [])
+        // Results (for team standings) - filter by tournament teams
+        const teamIds = (teamData || []).map(t => t.id)
+        let resultData: any[] = []
+        if (teamIds.length > 0) {
+          const { data, error: resultErr } = await supabase
+            .from('results')
+            .select('id, match_id, team_id, round_id, points, rank')
+            .in('team_id', teamIds)
+          if (resultErr) throw resultErr
+          resultData = data || []
+        }
+        setResults(resultData)
 
         // Users for participants
         const userIds = (memberData || []).map((m: Member) => m.user_id)
@@ -380,7 +386,9 @@ export default function TournamentPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {speakerStandings.map((speaker, index) => {
+                    {speakerStandings
+                      .sort((a, b) => (b.total_points || 0) - (a.total_points || 0)) // Sort by total points descending
+                      .map((speaker, index) => {
                       const maxRounds = Math.max(...speakerStandings.map(s => s.rounds_participated))
                       const member = members.find(m => m.id === speaker.member_id)
                       const user = member ? users[member.user_id] : null
@@ -534,11 +542,113 @@ export default function TournamentPage() {
       case 'results':
         return (
           <div className="bg-zinc-800 border border-zinc-700 rounded-xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-white mb-6">Results</h3>
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🏆</div>
-              <p className="text-zinc-400 text-lg">Results will be available after rounds are completed</p>
-            </div>
+            <h3 className="text-2xl font-bold text-white mb-6">Match Results</h3>
+            {results.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🏆</div>
+                <p className="text-zinc-400 text-lg">No results available yet</p>
+                <p className="text-zinc-500 text-sm mt-2">Results will appear when matches are completed</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Group results by round */}
+                {rounds.map(round => {
+                  const roundResults = results.filter(r => r.round_id === round.id)
+                  if (roundResults.length === 0) return null
+
+                  return (
+                    <div key={round.id} className="bg-zinc-700 rounded-lg p-6">
+                      <h4 className="text-xl font-semibold text-white mb-4">
+                        Round {round.round_number}
+                        {round.motion && (
+                          <div className="text-sm font-normal text-zinc-300 mt-1">
+                            Motion: {round.motion}
+                          </div>
+                        )}
+                      </h4>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-zinc-600">
+                              <th className="text-left py-3 px-4 font-semibold text-zinc-300">Rank</th>
+                              <th className="text-left py-3 px-4 font-semibold text-zinc-300">Team</th>
+                              <th className="text-left py-3 px-4 font-semibold text-zinc-300">Institution</th>
+                              <th className="text-center py-3 px-4 font-semibold text-zinc-300">Points</th>
+                              <th className="text-center py-3 px-4 font-semibold text-zinc-300">Avg Speaker Score</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {roundResults
+                              .sort((a, b) => a.rank - b.rank)
+                              .map((result) => {
+                                const team = teams.find(t => t.id === result.team_id)
+                                const teamSpeakers = speakerStandings.filter(s => s.team_name === team?.name)
+                                const avgSpeakerScore = teamSpeakers.length > 0 
+                                  ? (teamSpeakers.reduce((sum, s) => sum + (s.average_points || 0), 0) / teamSpeakers.length)
+                                  : 0
+
+                                return (
+                                  <tr key={result.id} className="border-b border-zinc-600 hover:bg-zinc-600 transition-colors">
+                                    <td className="py-3 px-4">
+                                      <div className="flex items-center">
+                                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white ${
+                                          result.rank === 1 ? 'bg-yellow-500' :
+                                          result.rank === 2 ? 'bg-gray-400' :
+                                          result.rank === 3 ? 'bg-orange-600' :
+                                          'bg-zinc-600'
+                                        }`}>
+                                          {result.rank}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4">
+                                      <div className="font-medium text-white">{team?.name || 'Unknown Team'}</div>
+                                    </td>
+                                    <td className="py-3 px-4 text-zinc-400">{team?.institution || '-'}</td>
+                                    <td className="py-3 px-4 text-center">
+                                      <span className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
+                                        result.points === 3 ? 'bg-yellow-900 text-yellow-300' :
+                                        result.points === 2 ? 'bg-gray-900 text-gray-300' :
+                                        result.points === 1 ? 'bg-orange-900 text-orange-300' :
+                                        'bg-red-900 text-red-300'
+                                      }`}>
+                                        {result.points} pts
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-center text-white">
+                                      {avgSpeakerScore > 0 ? avgSpeakerScore.toFixed(1) : '-'}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Overall Statistics */}
+                <div className="bg-zinc-700 rounded-lg p-6">
+                  <h4 className="text-xl font-semibold text-white mb-4">Tournament Statistics</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-zinc-800 border border-zinc-600 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-blue-400">{rounds.length}</div>
+                      <div className="text-zinc-400">Total Rounds</div>
+                    </div>
+                    <div className="bg-zinc-800 border border-zinc-600 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-green-400">{results.length}</div>
+                      <div className="text-zinc-400">Completed Matches</div>
+                    </div>
+                    <div className="bg-zinc-800 border border-zinc-600 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-purple-400">{teams.length}</div>
+                      <div className="text-zinc-400">Participating Teams</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
 

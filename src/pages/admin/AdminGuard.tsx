@@ -4,6 +4,37 @@ import { supabase } from '../../config/supabase'
 
 type GuardState = 'checking' | 'no-session' | 'ok' | 'not-admin' | 'error'
 
+// Simple session cache to prevent unnecessary re-authentication
+let lastSessionCheck: { userId: string; isAdmin: boolean; timestamp: number } | null = null
+const SESSION_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Try to restore admin status from localStorage
+const getStoredAdminStatus = (userId: string) => {
+  try {
+    const stored = localStorage.getItem(`admin_status_${userId}`)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Date.now() - parsed.timestamp < SESSION_CACHE_DURATION) {
+        return parsed.isAdmin
+      }
+    }
+  } catch (e) {
+    // Ignore parsing errors
+  }
+  return null
+}
+
+const setStoredAdminStatus = (userId: string, isAdmin: boolean) => {
+  try {
+    localStorage.setItem(`admin_status_${userId}`, JSON.stringify({
+      isAdmin,
+      timestamp: Date.now()
+    }))
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
 export default function AdminGuard() {
   const [state, setState] = useState<GuardState>('checking')
   const [message, setMessage] = useState<string | null>(null)
@@ -11,6 +42,10 @@ export default function AdminGuard() {
   const runIdRef = useRef(0)
   const inFlightRef = useRef(false)
   const errorTimerRef = useRef<number | null>(null)
+  const lastCheckTimeRef = useRef(0)
+
+  // Prevent rapid consecutive checks
+  const DEBOUNCE_DELAY = 1000 // 1 second
 
   async function rpcIsAdmin(): Promise<boolean> {
     const { data, error } = await supabase.rpc('current_is_admin')
@@ -38,6 +73,13 @@ export default function AdminGuard() {
   }
 
   const check = async (sessionArg?: { user?: { id?: string; email?: string | null } } | null) => {
+    // Debounce to prevent rapid consecutive checks
+    const now = Date.now()
+    if (now - lastCheckTimeRef.current < DEBOUNCE_DELAY && state === 'ok') {
+      return // Skip check if we just checked recently and are in good state
+    }
+    lastCheckTimeRef.current = now
+
     if (inFlightRef.current) return
     inFlightRef.current = true
     const myRun = ++runIdRef.current
@@ -50,7 +92,8 @@ export default function AdminGuard() {
       }
     }, 15000)
     try {
-      if (state !== 'ok') setState('checking')
+      // Only set to 'checking' if we're not already in a good state
+      if (state !== 'ok' && state !== 'checking') setState('checking')
       setMessage(null)
       // Use provided session if available to avoid an extra round-trip
       let sess: any = sessionArg ?? null
@@ -63,13 +106,47 @@ export default function AdminGuard() {
       const uid = sess?.user?.id
       const email = sess?.user?.email ?? null
       setSessionEmail(email)
-      if (!uid) { setState('no-session'); return }
+      if (!uid) { 
+        lastSessionCheck = null // Clear cache on logout
+        // Clear localStorage cache
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('admin_status_')) {
+              localStorage.removeItem(key)
+            }
+          })
+        } catch (e) {
+          // Ignore storage errors
+        }
+        setState('no-session') 
+        return 
+      }
+
+      // Check cache first to avoid unnecessary admin checks
+      if (lastSessionCheck && 
+          lastSessionCheck.userId === uid && 
+          Date.now() - lastSessionCheck.timestamp < SESSION_CACHE_DURATION) {
+        setState(lastSessionCheck.isAdmin ? 'ok' : 'not-admin')
+        return
+      }
+
+      // Check localStorage for cached admin status
+      const storedStatus = getStoredAdminStatus(uid)
+      if (storedStatus !== null) {
+        lastSessionCheck = { userId: uid, isAdmin: storedStatus, timestamp: Date.now() }
+        setState(storedStatus ? 'ok' : 'not-admin')
+        return
+      }
 
       // Prefer RPC if available
       try {
         const isAdmin = await withTimeout(rpcIsAdmin())
         if (runIdRef.current !== myRun) return
         if (errorTimerRef.current) { window.clearTimeout(errorTimerRef.current); errorTimerRef.current = null }
+        
+        // Update cache and localStorage
+        lastSessionCheck = { userId: uid, isAdmin, timestamp: Date.now() }
+        setStoredAdminStatus(uid, isAdmin)
         setState(isAdmin ? 'ok' : 'not-admin')
         return
       } catch {
@@ -83,6 +160,12 @@ export default function AdminGuard() {
           const res = await withTimeout(fallbackIsAdmin(uid, email))
           if (runIdRef.current !== myRun) return
           if (errorTimerRef.current) { window.clearTimeout(errorTimerRef.current); errorTimerRef.current = null }
+          
+          const isAdmin = res === true
+          // Update cache and localStorage
+          lastSessionCheck = { userId: uid, isAdmin, timestamp: Date.now() }
+          setStoredAdminStatus(uid, isAdmin)
+          
           if (res === true) { setState('ok'); return }
           if (res === false) { setState('not-admin'); return }
           setState('not-admin'); return
@@ -108,9 +191,14 @@ export default function AdminGuard() {
 
   useEffect(() => {
     check()
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (errorTimerRef.current) { window.clearTimeout(errorTimerRef.current); errorTimerRef.current = null }
-      if (!inFlightRef.current) check(session ?? null)
+      
+      // Only re-check on actual authentication changes, not on tab switching
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        if (!inFlightRef.current) check(session ?? null)
+      }
+      // Don't re-check on TOKEN_REFRESHED to prevent tab switching issues
     })
     return () => { sub.subscription.unsubscribe() }
   }, [])

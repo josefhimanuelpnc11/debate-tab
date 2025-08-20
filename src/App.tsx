@@ -1,37 +1,57 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
-import SupabaseStatus from './components/SupabaseStatus'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+import HomePage from './pages/HomePage'
+import TournamentPage from './pages/TournamentPage'
+import AuthPage from './pages/AuthPage'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminHome from './pages/admin/AdminHome'
+import AdminGuard from './pages/admin/AdminGuard'
+import TournamentsAdmin from './pages/admin/TournamentsAdmin'
+import TeamsAdmin from './pages/admin/TeamsAdmin'
+import RoundsAdmin from './pages/admin/RoundsAdmin'
+import SpeakersAdmin from './pages/admin/SpeakersAdmin'
+import MembersAdmin from './pages/admin/MembersAdmin'
+import MatchTeamsAdmin from './pages/admin/MatchTeamsAdmin'
+import ResultsAdmin from './pages/admin/ResultsAdmin'
+import TournamentAdminScope from './pages/admin/TournamentAdminScope'
+import UsersAdmin from './pages/admin/UsersAdmin'
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-  <hr />
-  <SupabaseStatus />
-    </>
+  <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <Navbar />
+  <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/tournament/:id" element={<TournamentPage />} />
+  <Route path="/auth" element={<AuthPage />} />
+        <Route element={<AdminGuard />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminHome />} />
+            <Route path="tournaments" element={<TournamentsAdmin />} />
+            <Route path="users" element={<UsersAdmin />} />
+            <Route path="tournaments/:id" element={<TournamentAdminScope />}>
+              <Route path="teams" element={<TeamsAdmin />} />
+              <Route path="rounds" element={<RoundsAdmin />} />
+              <Route path="speakers" element={<SpeakersAdmin />} />
+              <Route path="members" element={<MembersAdmin />} />
+              <Route path="match-teams" element={<MatchTeamsAdmin />} />
+              <Route path="results" element={<ResultsAdmin />} />
+            </Route>
+            <Route element={<TournamentAdminScope />}>
+              <Route path="teams" element={<TeamsAdmin />} />
+              <Route path="rounds" element={<RoundsAdmin />} />
+              <Route path="speakers" element={<SpeakersAdmin />} />
+              <Route path="members" element={<MembersAdmin />} />
+              <Route path="match-teams" element={<MatchTeamsAdmin />} />
+              <Route path="results" element={<ResultsAdmin />} />
+            </Route>
+          </Route>
+        </Route>
+      </Routes>
+  <Footer />
+    </BrowserRouter>
   )
 }
 
